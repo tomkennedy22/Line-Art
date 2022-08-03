@@ -2,8 +2,12 @@ from PIL import Image, ImageDraw
 import random
 import datetime
 
-total_loops = 100000
-line_length = 4
+total_loops = 1000000
+line_length = 10
+
+file_name = 'starry-night'
+file_extension = 'jpeg'
+
 
 def pixel_list_to_nested_array(pixel_list, size):
     
@@ -46,6 +50,9 @@ def random_coordinates(size):
 def line_points(coordinates):
     start_x, start_y, end_x, end_y = coordinates
 
+    orig_dist_x = end_x - start_x
+    orig_dist_y = end_y - start_y
+
     new_x = start_x
     new_y = start_y
 
@@ -55,19 +62,9 @@ def line_points(coordinates):
         dist_x = end_x - new_x
         dist_y = end_y - new_y
 
-        if dist_x == 0:
-            step_x = 0
-        elif dist_x < 0:
-            step_x = -1
-        elif dist_x > 0:
-            step_x = 1
+        step_x = int(dist_x / abs(dist_x)) if dist_x != 0 else 0
+        step_y = int(dist_y / abs(dist_y)) if dist_y != 0 else 0
 
-        if dist_y == 0:
-            step_y = 0
-        elif dist_y < 0:
-            step_y = -1
-        elif dist_y > 0:
-            step_y = 1
 
         if dist_y == 0:
             step_y = 0
@@ -121,20 +118,14 @@ def image_difference(image_a, image_b):
     return total_difference
 
 def melt_color(point, color, pixels):
-    # print('point', point)
     base_color = pixels[point[1]][point[0]]
-    # print('color', color, 'base_color', base_color, 'point', point)
     r = int((color[0] + base_color[0]) / 2)
     g = int((color[1] + base_color[1]) / 2)
     b = int((color[2] + base_color[2]) / 2)
-    # print('color', color, 'base_color', base_color, 'point', point, 'pixels', r,g,b)
     return (r,g,b)
 
 def set_color_to_map(point, point_color, pixels):
     pixels[point[1]][point[0]] = point_color
-
-file_name = 'lion'
-file_extension = 'jpg'
 
 with Image.open(f'input/{file_name}.{file_extension}') as original_image:
     print(original_image.size)
@@ -148,9 +139,10 @@ with Image.open(f'input/{file_name}.{file_extension}') as original_image:
     original_image_pixel_map = pixel_list_to_nested_array(list(original_image.getdata()), original_image.size)
     adjusted_image_pixel_map = pixel_list_to_nested_array(list(image_1.getdata()), image_1.size)
 
+    percent_size = total_loops / 100
     for ind in range(0,total_loops):
-        if ind % 10000 == 0:
-            print(f'Looped {ind} times')
+        if ind % percent_size == 0:
+            print(f'{int(ind/percent_size)}% complete')
 
         coorindates = random_coordinates(image_1.size)
         points = line_points(coorindates)
@@ -167,4 +159,4 @@ with Image.open(f'input/{file_name}.{file_extension}') as original_image:
 
     current_dt = datetime.datetime.now()
     timestamp = current_dt.strftime("%Y%m%d%H%M%S")
-    image_1.save(f'output/{file_name}_v2_{timestamp}_line_{line_length}_iter_{total_loops}.{file_extension}', "JPEG")
+    image_1.save(f'output/{file_name}_v3_{timestamp}_line_{line_length}_iter_{total_loops}.{file_extension}', "JPEG")
