@@ -1,13 +1,13 @@
 from PIL import Image, ImageDraw
 import random
 import datetime
+import sys
 
-total_loops = 1000000
-line_length = 10
+total_loops = 100000
+line_length = 100
 
-file_name = 'starry-night'
-file_extension = 'jpeg'
-
+file_name = 'lester'
+file_extension = 'jpg'
 
 def pixel_list_to_nested_array(pixel_list, size):
     
@@ -70,18 +70,15 @@ def line_points(coordinates):
             step_y = 0
         else:
             offset_ratio = abs(dist_x) * 1.0 / abs(dist_y)
-            if offset_ratio > 1.0:
-                offset_ratio -= 1
-                if random.random() < offset_ratio:
-                    step_y = 0
-            elif offset_ratio < 1.0:
-                offset_ratio = 1 - offset_ratio
-                if random.random() < offset_ratio:
-                    step_x = 0
+            if offset_ratio > 1.0 or (abs(orig_dist_x) > 0 and random.random() < (abs(dist_x ** 2)/abs(orig_dist_x ** 2))):
+                step_y = 0
+            elif offset_ratio < 1.0 or (abs(orig_dist_y) > 0 and random.random() < (abs(dist_y ** 2)/abs(orig_dist_y ** 2))):
+                step_x = 0
 
-        new_x = new_x + step_x
-        new_y = new_y + step_y
-        points.append((new_x, new_y))
+        if step_x !=0 or step_y != 0:
+            new_x = new_x + step_x
+            new_y = new_y + step_y
+            points.append((new_x, new_y))
 
     return points
 
@@ -150,8 +147,11 @@ with Image.open(f'input/{file_name}.{file_extension}') as original_image:
         color = get_line_average_colors(points, original_image_pixel_map)
 
         for point in points:
-            point_color = melt_color(point, color, adjusted_image_pixel_map)
-            set_color_to_map(point, point_color, adjusted_image_pixel_map)
+            if 'blend' in sys.argv:
+                point_color = melt_color(point, color, adjusted_image_pixel_map)
+                set_color_to_map(point, point_color, adjusted_image_pixel_map)
+            else:
+                point_color = color
                      
             image_1_draw.point(point, fill=point_color)
 
