@@ -3,7 +3,7 @@ import random
 import datetime
 
 total_loops = 1000000
-line_length = 6
+line_length = 25
 
 def pixel_list_to_nested_array(pixel_list, size):
     
@@ -104,7 +104,7 @@ def get_line_average_colors(line_points, pixels):
         g_total += pixel[1]
         b_total += pixel[2]
 
-    avg_color = (int(r_total / pixel_count), int(g_total/pixel_count), int(b_total/pixel_count), 32)
+    avg_color = (int(r_total / pixel_count), int(g_total/pixel_count), int(b_total/pixel_count))
 
     return avg_color
 
@@ -120,6 +120,18 @@ def image_difference(image_a, image_b):
 
     return total_difference
 
+def melt_color(point, color, pixels):
+    # print('point', point)
+    base_color = pixels[point[1]][point[0]]
+    # print('color', color, 'base_color', base_color, 'point', point)
+    r = int((color[0] + base_color[0]) / 2)
+    g = int((color[1] + base_color[1]) / 2)
+    b = int((color[2] + base_color[2]) / 2)
+    # print('color', color, 'base_color', base_color, 'point', point, 'pixels', r,g,b)
+    return (r,g,b)
+
+def set_color_to_map(point, point_color, pixels):
+    pixels[point[1]][point[0]] = point_color
 
 file_name = 'lester'
 file_extension = 'jpg'
@@ -127,16 +139,17 @@ file_extension = 'jpg'
 with Image.open(f'input/{file_name}.{file_extension}') as original_image:
     print(original_image.size)
 
-    image_1 = Image.new('RGB', original_image.size)
+    image_1 = Image.new('RGB', original_image.size, (0,0,0))
 
     image_1_draw = ImageDraw.Draw(image_1)
 
     original_image_pixels = list(original_image.getdata())
     height, width = original_image.size
     original_image_pixel_map = pixel_list_to_nested_array(list(original_image.getdata()), original_image.size)
+    adjusted_image_pixel_map = pixel_list_to_nested_array(list(image_1.getdata()), image_1.size)
 
     for ind in range(0,total_loops):
-        if ind % 1000 == 0:
+        if ind % 10000 == 0:
             print(f'Looped {ind} times')
 
         coorindates = random_coordinates(image_1.size)
@@ -144,10 +157,14 @@ with Image.open(f'input/{file_name}.{file_extension}') as original_image:
 
         color = get_line_average_colors(points, original_image_pixel_map)
 
-        image_1_draw.point(points, fill=color)
+        for point in points:
+            point_color = melt_color(point, color, adjusted_image_pixel_map)
+            set_color_to_map(point, point_color, adjusted_image_pixel_map)
+                     
+            image_1_draw.point(point, fill=point_color)
 
     image_1.show()
 
     current_dt = datetime.datetime.now()
     timestamp = current_dt.strftime("%Y%m%d%H%M%S")
-    image_1.save(f'output/{file_name}_{timestamp}_line_{line_length}_iter_{total_loops}.{file_extension}', "JPEG")
+    image_1.save(f'output/{file_name}_v2_{timestamp}_line_{line_length}_iter_{total_loops}.{file_extension}', "JPEG")
