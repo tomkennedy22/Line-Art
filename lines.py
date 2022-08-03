@@ -3,7 +3,7 @@ import random
 import datetime
 
 total_loops = 50000
-line_length = 30
+line_length = 10
 
 def pixel_list_to_nested_array(pixel_list, size):
     
@@ -124,15 +124,12 @@ def image_difference(image_a, image_b):
 file_name = 'bend1'
 file_extension = 'jpeg'
 
-with Image.open(f'{file_name}.{file_extension}') as original_image:
+with Image.open(f'input/{file_name}.{file_extension}') as original_image:
     print(original_image.size)
-    # original_image.show()
 
     image_1 = Image.new('RGB', original_image.size)
-    # image_2 = Image.new('RGB', original_image.size)
 
     image_1_draw = ImageDraw.Draw(image_1)
-    # image_2_draw = ImageDraw.Draw(image_2)
 
     original_image_pixels = list(original_image.getdata())
     height, width = original_image.size
@@ -149,10 +146,8 @@ with Image.open(f'{file_name}.{file_extension}') as original_image:
 
         image_1_draw.point(points, fill=color)
 
-
     image_1.show()
-    original_image.show()
 
     current_dt = datetime.datetime.now()
     timestamp = current_dt.strftime("%Y%m%d%H%M%S")
-    image_1.save(f'{file_name}_{timestamp}_line_{line_length}_iter_{total_loops}.{file_extension}', "JPEG")
+    image_1.save(f'output/{file_name}_{timestamp}_line_{line_length}_iter_{total_loops}.{file_extension}', "JPEG")
