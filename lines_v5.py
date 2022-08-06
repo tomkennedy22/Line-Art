@@ -3,8 +3,8 @@ import random
 import datetime
 import sys
 
-file_name = 'lion'
-file_extension = 'jpg'
+file_name = 'lion-1k'
+file_extension = 'jpeg'
 
 shift_amount = 0
 
@@ -24,6 +24,32 @@ def pixel_list_to_nested_array(pixel_list, size):
     pixels.append(pixel_row)
     return pixels
 
+def random_coordinates_from_list(size, line_length, pixel_list):
+    get_coords = True
+    while get_coords:
+        starting_pixel = pixel_list.pop(0)[0]
+        start_x = starting_pixel[1]
+        start_y = starting_pixel[0]
+
+        end_x = random.randint(start_x - line_length, start_x + line_length)
+        end_x = min(max(0, end_x), size[0] - 1)
+
+        dist_x = abs(end_x - start_x)
+
+        # print('start_x', start_x, 'dist_x', dist_x, 'end_x', end_x, 'start_y', start_y, 'line_length', line_length)
+
+        dist_y = int(((line_length ** 2) - (dist_x ** 2)) ** .5)
+
+        if random.random() < .5:
+            dist_y *= -1
+            
+        end_y = min(max(0, start_y + dist_y), size[1] - 1)
+
+        if start_x != end_x or start_y != end_y:
+            get_coords = False
+
+    return (start_x, start_y, end_x, end_y)
+
 def random_coordinates(size, line_length):
 
     get_coords = True
@@ -31,29 +57,18 @@ def random_coordinates(size, line_length):
         start_x = random.randint(0, size[0] - 1)
         start_y = random.randint(0, size[1] - 1)
 
-        diag_line_length = int(((line_length ** 2) / 2) ** .5)
 
-        r = random.random()
-        if r < .25:
-            # Vertical Line
-            end_x = start_x
-            end_y = start_y - line_length
-        elif r < .5:
-            # Horizontal line
-            end_x = start_x + line_length
-            end_y = start_y
-        elif r < .75:
-            # Diag up right
-            end_x = start_x + diag_line_length
-            end_y = start_y - diag_line_length
-        else:
-            # Diag down right
-            end_x = start_x + diag_line_length
-            end_y = start_y + diag_line_length
-        
-
+        end_x = random.randint(start_x - line_length, start_x + line_length)
         end_x = min(max(0, end_x), size[0] - 1)
-        end_y = min(max(0, end_y), size[1] - 1)
+
+        dist_x = abs(end_x - start_x)
+
+        dist_y = int(((line_length ** 2) - (dist_x ** 2)) ** .5)
+
+        if random.random() < .5:
+            dist_y *= -1
+            
+        end_y = min(max(0, start_y + dist_y), size[1] - 1)
 
         if start_x != end_x or start_y != end_y:
             get_coords = False
@@ -74,6 +89,14 @@ def line_points(coordinates):
 
         step_x = int(dist_x / abs(dist_x)) if dist_x != 0 else 0
         step_y = int(dist_y / abs(dist_y)) if dist_y != 0 else 0
+
+        if dist_y != 0 and abs(dist_x) > abs(dist_y):
+            if random.random() < ((abs(dist_x) - abs(dist_y)) / abs(dist_y)):
+                step_y = 0
+        
+        elif dist_x != 0 and dist_y > dist_x:
+            if random.random() < ((abs(dist_y) - abs(dist_x)) / abs(dist_x)):
+                step_x = 0
 
         if step_x !=0 or step_y != 0:
             new_x = new_x + step_x
@@ -130,9 +153,12 @@ def mutated_coordinates(coordinates, shift, size):
 
     return (validate_edge(coorindates[0] + shift, size[0]), validate_edge(coorindates[1] + shift, size[1]), coordinates[2], coordinates[3])
 
-def get_all_colors(pixels, make_unique=True):
+def get_all_colors(pixels, make_unique=True, color_flatten=1):
     colors = []
     for pixel in pixels:
+        if color_flatten > 1:
+            for color in pixel:
+                color = int(int(color / color_flatten) * color_flatten)
         colors.append(pixel)
 
     if make_unique:
@@ -141,6 +167,23 @@ def get_all_colors(pixels, make_unique=True):
 
 def get_random_color(colors):
     return colors[int(random.random() * (len(colors) - 1))]
+
+def pixel_difference_list(original_image_pixel_map, adjusted_image_pixel_map):
+
+    pixel_difference = []
+
+    for row_ind, row in enumerate(original_image_pixel_map):
+        for col_ind, pixel in enumerate(row):
+            original_color = original_image_pixel_map[row_ind][col_ind]
+            adjusted_color = adjusted_image_pixel_map[row_ind][col_ind]
+            color_diff = get_residual(original_color, adjusted_color)
+            pixel_difference.append(((col_ind, row_ind), color_diff))
+
+    # print('pixel_difference', pixel_difference[0:10])
+
+    reverse_list = random.random() < .5
+
+    return sorted(pixel_difference, key=lambda elem: elem[1], reverse=reverse_list)
 
 def get_residual(color_a, color_b):
     return ((color_a[0] - color_b[0]) ** 2) +  ((color_a[1] - color_b[1]) ** 2) + ((color_a[2] - color_b[2]) ** 2)
@@ -168,7 +211,7 @@ def should_draw_line(original_image_pixel_map, adjusted_image_pixel_map, color, 
     new_RMSE = get_RMSE(num_points, rsum_new)
     old_RMSE = get_RMSE(num_points, rsum_original)
 
-    if (new_RMSE < old_RMSE):
+    if (new_RMSE < (old_RMSE * 1.2)):
         return True
     else:
         return False
@@ -184,32 +227,50 @@ with Image.open(f'input/{file_name}.{file_extension}') as original_image:
 
     original_image_pixels = list(original_image.getdata())
     height, width = original_image.size
-    original_image_pixel_map = pixel_list_to_nested_array(list(original_image.getdata()), original_image.size)
-    adjusted_image_pixel_map = pixel_list_to_nested_array(list(image_1.getdata()), image_1.size)
+    # O(h * w)
+    original_image_pixel_map = pixel_list_to_nested_array(original_image_pixels, (height, width))
+    adjusted_image_pixel_map = pixel_list_to_nested_array(list(image_1.getdata()), (height, width))
 
-    line_length = 20 #int( height * width / 50000)
-    total_loops = int(height * width * 2)
+    line_length = int( height * width / 100000)
+    total_loops = int(height * width * .25)
     percent_size = total_loops / 100
 
-    all_colors = get_all_colors(original_image_pixels, make_unique=False)
+    # O(h * w)
+    all_colors = get_all_colors(original_image_pixels, make_unique=True, color_flatten=1)
 
     line_add_count = 0
+    # O( h * w * 2)
     for ind in range(0,total_loops):
         if ind % (percent_size * 5) == 0:
             print(f'{int(ind/percent_size)}% complete')
-        
-        coorindates = random_coordinates(image_1.size, line_length)
+
+        if ind % (percent_size) == 0:
+            pixel_list = pixel_difference_list(original_image_pixel_map=original_image_pixel_map, adjusted_image_pixel_map=adjusted_image_pixel_map)
+
+        # O( 1 )
+        #coorindates = random_coordinates((height, width), line_length)
+        coorindates = random_coordinates_from_list((height, width), line_length, pixel_list)
+        # O( l )
         points = line_points(coorindates)
 
+        # O( 1 )
         color = get_random_color(all_colors)
 
+        # O( l )
         if should_draw_line(original_image_pixel_map = original_image_pixel_map, adjusted_image_pixel_map=adjusted_image_pixel_map, color=color, points=points):
-            image_1_draw.line(points, fill=color)
+            #image_1_draw.line(points, fill=color)
             line_add_count +=1
+            # O( l )
             for point in points:
                 adjusted_image_pixel_map[point[1]][point[0]] = color
 
+    # O( h * w )
+    for row_ind, row in enumerate(adjusted_image_pixel_map):
+        for col_ind, color in enumerate(row):
+            image_1_draw.point((col_ind, row_ind), fill=color)
+    
     print(f'{line_add_count} of {total_loops} lines drawn. {line_add_count * 100.0 / total_loops}%')
+    image_1 = image_1.resize((int(height/4) , int(width/4)), resample=Image.LANCZOS)
     image_1.show()
 
     end_dt = datetime.datetime.now()
