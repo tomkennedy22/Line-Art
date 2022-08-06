@@ -3,8 +3,8 @@ import random
 import datetime
 import sys
 
-file_name = 'lion-4k'
-file_extension = 'jpeg'
+file_name = 'lion'
+file_extension = 'jpg'
 
 shift_amount = 0
 
@@ -31,32 +31,37 @@ def random_coordinates(size, line_length):
         start_x = random.randint(0, size[0] - 1)
         start_y = random.randint(0, size[1] - 1)
 
-        min_x = max(0, start_x - line_length)
-        max_x = min(start_x+line_length, size[0] - 1)
+        diag_line_length = int(((line_length ** 2) / 2) ** .5)
 
-        end_x = random.randint(min_x, max_x)
-
-        diff_x = end_x - start_x
-        diff_y = (((line_length ** 2) - (diff_x ** 2)) ** .5)
-
-        if random.random() < .5:
-            end_y = int(start_y + diff_y)
+        r = random.random()
+        if r < .25:
+            # Vertical Line
+            end_x = start_x
+            end_y = start_y - line_length
+        elif r < .5:
+            # Horizontal line
+            end_x = start_x + line_length
+            end_y = start_y
+        elif r < .75:
+            # Diag up right
+            end_x = start_x + diag_line_length
+            end_y = start_y - diag_line_length
         else:
-            end_y = int(start_y - diff_y)
+            # Diag down right
+            end_x = start_x + diag_line_length
+            end_y = start_y + diag_line_length
+        
 
+        end_x = min(max(0, end_x), size[0] - 1)
         end_y = min(max(0, end_y), size[1] - 1)
 
         if start_x != end_x or start_y != end_y:
             get_coords = False
 
-
     return (start_x, start_y, end_x, end_y)
 
 def line_points(coordinates):
     start_x, start_y, end_x, end_y = coordinates
-
-    orig_dist_x = end_x - start_x
-    orig_dist_y = end_y - start_y
 
     new_x = start_x
     new_y = start_y
@@ -70,15 +75,6 @@ def line_points(coordinates):
         step_x = int(dist_x / abs(dist_x)) if dist_x != 0 else 0
         step_y = int(dist_y / abs(dist_y)) if dist_y != 0 else 0
 
-        if dist_y == 0:
-            step_y = 0
-        else:
-            offset_ratio = abs(dist_x) * 1.0 / abs(dist_y)
-            if offset_ratio > 1.0 and random.random() < abs(1 - offset_ratio):
-                step_y = 0
-            elif offset_ratio < 1.0 and random.random() < abs(1 - offset_ratio):
-                step_x = 0
-
         if step_x !=0 or step_y != 0:
             new_x = new_x + step_x
             new_y = new_y + step_y
@@ -87,7 +83,6 @@ def line_points(coordinates):
     return points
 
 def get_line_average_colors(line_points, pixels):
-
 
     r_total = 0
     g_total = 0
@@ -135,6 +130,51 @@ def mutated_coordinates(coordinates, shift, size):
 
     return (validate_edge(coorindates[0] + shift, size[0]), validate_edge(coorindates[1] + shift, size[1]), coordinates[2], coordinates[3])
 
+def get_all_colors(pixels, make_unique=True):
+    colors = []
+    for pixel in pixels:
+        colors.append(pixel)
+
+    if make_unique:
+        colors = list(set(colors))
+    return colors
+
+def get_random_color(colors):
+    return colors[int(random.random() * (len(colors) - 1))]
+
+def get_residual(color_a, color_b):
+    return ((color_a[0] - color_b[0]) ** 2) +  ((color_a[1] - color_b[1]) ** 2) + ((color_a[2] - color_b[2]) ** 2)
+
+def get_RMSE( n, rsum):
+    # return the root mean squared error of the vector of residuals
+    if (n != 0):
+        return ((rsum / n) ** .5)
+
+    return 0
+
+
+def should_draw_line(original_image_pixel_map, adjusted_image_pixel_map, color, points):
+    num_points = len(points)
+    rsum_new = 0
+    rsum_original = 0
+
+    for point in points:
+        original_color = original_image_pixel_map[point[1]][point[0]]
+        adjusted_color = adjusted_image_pixel_map[point[1]][point[0]]
+
+        rsum_new += get_residual(original_color, color)
+        rsum_original += get_residual(original_color, adjusted_color)
+        
+    new_RMSE = get_RMSE(num_points, rsum_new)
+    old_RMSE = get_RMSE(num_points, rsum_original)
+
+    if (new_RMSE < old_RMSE):
+        return True
+    else:
+        return False
+
+begin_dt = datetime.datetime.now()
+
 with Image.open(f'input/{file_name}.{file_extension}') as original_image:
     print(original_image.size)
 
@@ -147,34 +187,33 @@ with Image.open(f'input/{file_name}.{file_extension}') as original_image:
     original_image_pixel_map = pixel_list_to_nested_array(list(original_image.getdata()), original_image.size)
     adjusted_image_pixel_map = pixel_list_to_nested_array(list(image_1.getdata()), image_1.size)
 
-    line_length = 25 #int( height * width / 50000)
-    total_loops = int(height * width / 5)
+    line_length = 20 #int( height * width / 50000)
+    total_loops = int(height * width * 2)
     percent_size = total_loops / 100
 
+    all_colors = get_all_colors(original_image_pixels, make_unique=False)
+
+    line_add_count = 0
     for ind in range(0,total_loops):
-        if ind % (percent_size ) == 0:
+        if ind % (percent_size * 5) == 0:
             print(f'{int(ind/percent_size)}% complete')
-
-        points = []
         
-        for shift in range(shift_amount * -1, shift_amount+1):
-            coorindates = random_coordinates(image_1.size, line_length)
-            coorindates = mutated_coordinates(coorindates, shift, image_1.size)
-            points += line_points(coorindates)
+        coorindates = random_coordinates(image_1.size, line_length)
+        points = line_points(coorindates)
 
-        color = get_line_average_colors(points, original_image_pixel_map)
+        color = get_random_color(all_colors)
 
-        for point in points:
-            if 'drawover' in sys.argv:
-                point_color = color
-            else:
-                point_color = melt_color(point, color, adjusted_image_pixel_map)
-                set_color_to_map(point, point_color, adjusted_image_pixel_map)
-                     
-            image_1_draw.point(point, fill=point_color)
+        if should_draw_line(original_image_pixel_map = original_image_pixel_map, adjusted_image_pixel_map=adjusted_image_pixel_map, color=color, points=points):
+            image_1_draw.line(points, fill=color)
+            line_add_count +=1
+            for point in points:
+                adjusted_image_pixel_map[point[1]][point[0]] = color
 
+    print(f'{line_add_count} of {total_loops} lines drawn. {line_add_count * 100.0 / total_loops}%')
     image_1.show()
 
-    current_dt = datetime.datetime.now()
-    timestamp = current_dt.strftime("%Y%m%d%H%M%S")
-    image_1.save(f'output/{file_name}_v3_{timestamp}_line_{line_length}_iter_{total_loops}.{file_extension}', "JPEG")
+    end_dt = datetime.datetime.now()
+    timestamp = end_dt.strftime("%Y%m%d%H%M%S")
+    image_1.save(f'output/{file_name}_v5_{timestamp}_line_{line_length}_iter_{total_loops}.{file_extension}', "JPEG")
+    seconds_elapsed = (end_dt - begin_dt).total_seconds()
+    print(f'Program ran in {seconds_elapsed} seconds')
